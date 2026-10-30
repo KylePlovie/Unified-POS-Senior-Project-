@@ -1,0 +1,6 @@
+{
+  "name": "print-service",
+  "version": "1.0.0",
+  "scripts": { "dev": "ts-node-dev --respawn src/index.ts", "start": "ts-node src/index.ts" },
+  "devDependencies": { "@types/node": "^20.11.0", "ts-node": "^10.9.2", "ts-node-dev": "^2.0.0", "typescript": "^5.3.3" }
+}

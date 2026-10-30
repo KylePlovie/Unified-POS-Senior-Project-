@@ -1,0 +1,133 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        String   @id @default(uuid())
+  name      String
+  pin       String
+  role      String   @default("SERVER") // SERVER | BARTENDER | MANAGER
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  tabs      Tab[]
+  auditLogs AuditLog[]
+  requestsMade     BarRequest[] @relation("requestedByUser")
+  requestsFulfilled BarRequest[] @relation("fulfilledByUser")
+}
+
+model Tab {
+  id           String    @id @default(uuid())
+  customerName String?
+  laneNumber   Int?
+  barLocation  String    @default("I_BAR") // I_BAR | SERVICE_BAR | QUICKIE_BAR
+  status       String    @default("OPEN")  // OPEN | CLOSED | VOIDED
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  closedAt     DateTime?
+  createdBy    User      @relation(fields: [createdById], references: [id])
+  createdById  String
+  lineItems    LineItem[]
+  payments     Payment[]
+  @@index([status])
+  @@index([barLocation])
+}
+
+model LineItem {
+  id          String   @id @default(uuid())
+  description String
+  category    String
+  quantity    Int      @default(1)
+  unitPrice   Float
+  routeTo     String   // I_BAR | SERVICE_BAR | QUICKIE_BAR
+  status      String   @default("PENDING") // PENDING | SENT | PRINTED | VOIDED | COMPED
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  voidReason  String?
+  compReason  String?
+  tab         Tab      @relation(fields: [tabId], references: [id])
+  tabId       String
+  printJobs   PrintJob[]
+  @@index([tabId])
+  @@index([routeTo])
+}
+
+model Payment {
+  id          String   @id @default(uuid())
+  paymentType String   // CASH | CARD
+  amount      Float
+  tip         Float    @default(0)
+  createdAt   DateTime @default(now())
+  tab         Tab      @relation(fields: [tabId], references: [id])
+  tabId       String
+  @@index([tabId])
+}
+
+model PrintJob {
+  id          String    @id @default(uuid())
+  barLocation String
+  status      String    @default("QUEUED") // QUEUED | PRINTING | PRINTED | FAILED
+  payload     String
+  attempts    Int       @default(0)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  printedAt   DateTime?
+  lineItem    LineItem  @relation(fields: [lineItemId], references: [id])
+  lineItemId  String
+  @@index([barLocation, status])
+}
+
+model AuditLog {
+  id          String   @id @default(uuid())
+  actionType  String
+  description String
+  entityType  String
+  entityId    String
+  timestamp   DateTime @default(now())
+  performedBy User     @relation(fields: [userId], references: [id])
+  userId      String
+  @@index([actionType])
+  @@index([timestamp])
+}
+
+// MENU ITEMS — drinks/shots/etc managed by managers
+model MenuItem {
+  id          String   @id @default(uuid())
+  name        String
+  category    String   // "Beer - Draft", "Cocktail", "Shot", etc.
+  price       Float
+  availableAt String   @default("I_BAR,SERVICE_BAR,QUICKIE_BAR") // comma-separated bar locations
+  active      Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  @@index([category])
+  @@index([active])
+}
+
+// BAR REQUESTS — cross-bar item requests
+model BarRequest {
+  id              String    @id @default(uuid())
+  fromBar         String    // bar that needs the item
+  toBar           String    // bar that has the item
+  itemDescription String    // what's needed
+  quantity        Int       @default(1)
+  status          String    @default("PENDING") // PENDING | FULFILLED | CANCELLED
+  notes           String?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  fulfilledAt     DateTime?
+  // Link to the line item that triggered it
+  lineItemId      String?
+  tabId           String?
+  requestedBy     User      @relation("requestedByUser", fields: [requestedById], references: [id])
+  requestedById   String
+  fulfilledBy     User?     @relation("fulfilledByUser", fields: [fulfilledById], references: [id])
+  fulfilledById   String?
+  @@index([toBar, status])
+  @@index([status])
+}
